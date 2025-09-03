@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RAG Knowledge Tab</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #queryInput { width: 80%; padding: 10px; margin-right: 10px; }
+        #submitButton { padding: 10px; }
+        #responseArea { margin-top: 20px; padding: 10px; border: 1px solid #ccc; min-height: 150px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h2>RAG Knowledge Base Query</h2>
+    <div>
+        <input type="text" id="queryInput" placeholder="Enter your question...">
+        <button id="submitButton">Get Answer</button>
+    </div>
+    <div id="responseArea">
+        Enter a query above and click "Get Answer".
+    </div>
+
+    <script>
+        // Assuming your backend is hosted at this URL
+        // YOU WILL NEED TO REPLACE THIS WITH THE ACTUAL PUBLIC URL OF YOUR RENDER BACKEND's /query endpoint
+        const BACKEND_URL = "https://app-temas.onrender.com/query"; // <-- REPLACE THIS
+
+        const queryInput = document.getElementById('queryInput');
+        const submitButton = document.getElementById('submitButton');
+        const responseArea = document.getElementById('responseArea');
+
+        submitButton.addEventListener('click', async () => {
+            const query = queryInput.value.trim();
+            if (!query) {
+                responseArea.innerText = "Please enter a query.";
+                return;
+            }
+
+            responseArea.innerText = "Sending query to backend...";
+
+            try {
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query }),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+
+                const responseData = await response.json();
+                const ragResponse = responseData.response || "No response received from backend.";
+
+                responseArea.innerText = ragResponse;
+
+            } catch (error) {
+                responseArea.innerText = `Error communicating with backend: ${error}`;
+                console.error('Error fetching response:', error);
+            }
+        });
+    </script>
+</body>
+</html>
+
