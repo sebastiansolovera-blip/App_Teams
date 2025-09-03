@@ -3,86 +3,168 @@ import json
 from urllib.parse import urlparse
 
 # Assume the project root is now 'App_Teams'
+# If your structure in GitHub is different (e.g., backend/ at root),
+# you might need to adjust paths used below or restructure locally.
 project_dir = "App_Teams"
 
 # Ensure we are in the project root directory where manifest.json should be
+# Adjust this path if your local project root is different from /content/App_Teams
 try:
     os.chdir(f'/content/{project_dir}')
     print(f"Changed directory to /content/{project_dir}")
 except FileNotFoundError:
     print(f"Could not change directory to /content/{project_dir}. Please ensure the directory exists and you are in the correct parent directory.")
+    # If directory change fails, try to proceed assuming current dir is the root
+    project_dir = "." # Assume current directory is the root
+
 
 manifest_path = "manifest.json"
 
-# Load the existing manifest content
+# Load the existing manifest content, or start with a base if it doesn't exist
+manifest_content = {}
+if os.path.exists(manifest_path):
+    try:
+        with open(manifest_path, "r") as f:
+            manifest_content = json.load(f)
+        print(f"Loaded existing manifest from {manifest_path}")
+    except json.JSONDecodeError:
+        print(f"Warning: Could not decode JSON from {manifest_path}. Starting with a new manifest structure.")
+        manifest_content = {} # Reset if JSON is invalid
+else:
+    print(f"manifest.json not found at {manifest_path}. Creating a new one with base structure.")
+    # Provide a base structure if the file didn't exist or was invalid JSON
+    manifest_content = {
+        "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+        "manifestVersion": "1.16",
+        "version": "1.0.0",
+        "id": "{{MicrosoftAppId}}", # Placeholder - you can put your App ID if you have one, or leave as placeholder
+        "packageName": "com.example.knowledgemanagementpoc.tab", # Updated package name
+        "developer": {
+            "name": "Your Name or Company",
+            "websiteUrl": "https://yourwebsite.com", # Replace
+            "privacyUrl": "https://yourwebsite.com/privacy", # Replace
+            "termsOfUseUrl": "https://yourwebsite.com/terms" # Replace
+        },
+        "name": {
+            "short": "Knowledge RAG Tab", # Updated name
+            "full": "Knowledge Retrieval Augmented Generation Tab PoC" # Updated name
+        },
+        "description": {
+            "short": "A PoC demonstrating RAG functionality in a Teams Tab", # Updated description
+            "full": "This is a proof of concept Teams Tab that integrates Retrieval Augmented Generation (RAG) to answer questions based on local documents by connecting to a backend API." # Updated description
+        },
+        "icons": {
+            "outline": "outline.png",
+            "color": "color.png"
+        },
+        "accentColor": "#60A5FA",
+        "permissions": [
+            "identity", # Consider if needed for Tab
+            "messageTeamMembers" # Consider if needed for Tab
+        ],
+        "validDomains": [] # IMPORTANT: Add your hosted frontend AND backend domains here
+    }
+
+
+# --- Configuration for the Tab ---
+
+# Placeholder for the public URL where your App_Teams folder is hosted
+# If your frontend is hosted at https://sebastiansolovera-blip.github.io/App_Temas/, use that base URL
+user_frontend_base_url = "https://sebastiansolovera-blip.github.io/App_Temas/" # <-- REPLACE WITH YOUR ACTUAL GITHUB PAGES URL BASE
+
+# Construct the full URL to index.html based on your *expected* structure relative to the base URL
+# Assuming index.html is at https://<base_url>/frontend/index.html
+frontend_index_html_url = user_frontend_base_url.rstrip('/') + "/frontend/index.html"
+frontend_config_url = user_frontend_base_url.rstrip('/') + "/frontend/index.html#/config" # Assuming config page is same file with #/config
+
+# Extract the domain from the frontend URL
+parsed_url = urlparse(user_frontend_base_url)
+hosted_frontend_domain = parsed_url.netloc
+
+# Placeholder for your hosted backend domain (from Render)
+# YOU WILL NEED TO REPLACE THIS WITH YOUR ACTUAL RENDER BACKEND DOMAIN
+hosted_backend_domain = "your-render-backend-domain.onrender.com" # <-- REPLACE WITH YOUR ACTUAL RENDER DOMAIN
+# Extract domain from URL if it starts with http(s) - useful if user provides full URL
+if hosted_backend_domain.startswith("http"):
+     parsed_backend_url = urlparse(hosted_backend_domain)
+     hosted_backend_domain = parsed_backend_url.netloc
+
+
+# Add or update the configurableTabs section
+manifest_content["configurableTabs"] = [
+    {
+        "configurationUrl": frontend_config_url,
+        "canUpdateConfiguration": True,
+        "scopes": [
+            "team",
+            "groupchat",
+            "personal"
+        ]
+    }
+]
+
+# Add or update the staticTabs section
+manifest_content["staticTabs"] = [
+     {
+         "entityId": "knowledgeRagStaticTab", # Unique ID for this static tab
+         "name": "Knowledge RAG",
+         "contentUrl": frontend_index_html_url,
+         "scopes": [
+             "personal" # Available as a personal app tab
+         ]
+     }
+ ]
+
+# Update validDomains to include both frontend and backend domains
+if hosted_frontend_domain and hosted_frontend_domain not in manifest_content.get("validDomains", []):
+     if "validDomains" not in manifest_content:
+         manifest_content["validDomains"] = []
+     manifest_content["validDomains"].append(hosted_frontend_domain)
+     print(f"Added frontend domain '{hosted_frontend_domain}' to validDomains.")
+elif not hosted_frontend_domain:
+     print("Warning: Could not extract domain from the hosted frontend URL. Please manually add the domain to validDomains.")
+
+if hosted_backend_domain and hosted_backend_domain not in manifest_content.get("validDomains", []):
+     if "validDomains" not in manifest_content:
+         manifest_content["validDomains"] = []
+     manifest_content["validDomains"].append(hosted_backend_domain)
+     print(f"Added backend domain '{hosted_backend_domain}' to validDomains.")
+elif not hosted_backend_domain:
+     print("Warning: Backend domain is not set. Please manually add the backend domain to validDomains.")
+
+
+# Remove the 'bots' section if it exists, as we are focusing on the Tab integration path
+if "bots" in manifest_content:
+     del manifest_content["bots"]
+     print("Removed 'bots' section from manifest as we are focusing on a Tab.")
+
+# Remove other sections not typically used for a simple Tab if they exist from a previous Bot manifest
+sections_to_remove_if_tab_only = ["composeExtensions", "configurableTabs", "staticTabs", "bots"] # List includes itself but safe
+for section in sections_to_remove_if_tab_only:
+    if section in manifest_content and section not in ["configurableTabs", "staticTabs"]: # Don't remove the tabs we just added/updated
+         del manifest_content[section]
+         print(f"Removed section '{section}' from manifest.")
+
+# Ensure we have the required sections for a Tab (developer, name, description, icons, accentColor, permissions, validDomains)
+required_tab_sections = ["manifestVersion", "version", "id", "packageName", "developer", "name", "description", "icons", "accentColor", "permissions", "validDomains"]
+for section in required_tab_sections:
+    if section not in manifest_content:
+        print(f"Warning: Missing required manifest section for Tab: '{section}'. Please add it manually.")
+
+
+# Save the updated manifest content
 try:
-    with open(manifest_path, "r") as f:
-        manifest_content = json.load(f)
-    print(f"Loaded existing manifest from {manifest_path}")
-
-    # User provided frontend URL
-    user_frontend_base_url = "https://sebastiansolovera-blip.github.io/App_Temas/"
-    # Construct the full URL to index.html based on the project structure
-    frontend_index_html_url = user_frontend_base_url + "frontend/index.html"
-    frontend_config_url = user_frontend_base_url + "frontend/index.html#/config" # Assuming config page is same file
-
-    # Extract the domain from the frontend URL
-    parsed_url = urlparse(user_frontend_base_url)
-    hosted_frontend_domain = parsed_url.netloc
-
-    # Add or update the configurableTabs section
-    manifest_content["configurableTabs"] = [
-        {
-            "configurationUrl": frontend_config_url, # Use the constructed config URL
-            "canUpdateConfiguration": True,
-            "scopes": [
-                "team",
-                "groupchat",
-                "personal"
-            ]
-        }
-    ]
-
-    # Add or update the staticTabs section
-    manifest_content["staticTabs"] = [
-         {
-             "entityId": "knowledgeRagStaticTab",
-             "name": "Knowledge RAG",
-             "contentUrl": frontend_index_html_url, # Use the constructed index.html URL
-             "scopes": [
-                 "personal"
-             ]
-         }
-     ]
-
-    # Update validDomains to include the frontend domain
-    if hosted_frontend_domain and hosted_frontend_domain not in manifest_content["validDomains"]:
-         manifest_content["validDomains"].append(hosted_frontend_domain)
-         print(f"Added '{hosted_frontend_domain}' to validDomains.")
-    elif not hosted_frontend_domain:
-         print("Warning: Could not extract domain from the hosted frontend URL. Please manually add the domain to validDomains.")
-
-    # Decide whether to keep or remove the 'bots' section.
-    # If you are ONLY using a Tab, you can remove the 'bots' section.
-    # If you want both a Bot and a Tab, keep it.
-    # For this path focusing on the Tab, let's assume we remove the bot section for clarity in the manifest.
-    if "bots" in manifest_content:
-         del manifest_content["bots"]
-         print("Removed 'bots' section from manifest as we are focusing on a Tab.")
-
-
-    # Save the updated manifest content
     with open(manifest_path, "w") as f:
         json.dump(manifest_content, f, indent=4)
-
-    print(f"Teams application manifest updated at: {manifest_path}")
-
-except FileNotFoundError:
-    print(f"Error: manifest.json not found at {manifest_path}. Please ensure the file exists in the project root '{project_dir}'.")
-except json.JSONDecodeError:
-    print(f"Error: Could not decode JSON from {manifest_path}. Please check the file content.")
+    print(f"Teams application manifest created/updated at: {os.path.join(os.getcwd(), manifest_path)}")
 except Exception as e:
-    print(f"An unexpected error occurred: {e}")
+    print(f"Error creating/updating manifest file: {e}")
 
-# Note: You will still need to update the BACKEND_URL in your hosted index.html file
-# with the public URL of your Render backend once it's deployed.
+# --- Summary for Manual Updates ---
+print("\n--- Summary for Manual Updates ---")
+print("After deploying your frontend and backend, you MUST manually edit:")
+print(f"- {os.path.join(project_dir, 'frontend', 'index.html')}: Replace 'https://YOUR_RENDER_BACKEND_URL/query' with your actual Render backend /query URL.")
+print(f"- {os.path.join(project_dir, 'manifest.json')}:")
+print(f"  - Replace 'https://sebastiansolovera-blip.github.io/App_Temas/' with your actual GitHub Pages base URL if it's different.")
+print(f"  - Replace 'your-render-backend-domain.onrender.com' with your actual Render backend domain in 'validDomains'.")
+print("--- End Summary ---")
