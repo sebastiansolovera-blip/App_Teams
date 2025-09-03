@@ -13,8 +13,11 @@ from contextlib import asynccontextmanager
 from botbuilder.core import BotFrameworkAdapter, BotFrameworkAdapterSettings, TurnContext, ActivityHandler, MessageFactory
 from botbuilder.schema import Activity, ActivityTypes
 
-# Define the path to the data folder
-DATA_PATH = "knowledge_management_poc/backend/data"
+# Define the path to the data folder - ADJUST THIS BASED ON YOUR STRUCTURE IF NEEDED
+# If your backend root in Render is /backend, DATA_PATH should be "./data"
+# If your backend root in Render is /App_Teams/backend, DATA_PATH should be "./data"
+# Let's keep it relative to the backend folder for simplicity in deployment root
+DATA_PATH = "./data"
 
 # Global variable to hold the RAG chain
 rag_chain = None
@@ -36,7 +39,15 @@ def load_documents(data_path: str):
     """
     documents = []
     print(f"Scanning directory: {data_path}")
-    for root, _, files in os.walk(data_path):
+    # Use the data_path relative to the script's execution location
+    full_data_path = os.path.join(os.path.dirname(__file__), data_path)
+    print(f"Scanning full path: {full_data_path}") # Added print for debugging
+
+    if not os.path.exists(full_data_path):
+        print(f"Error: Data directory not found at {full_data_path}")
+        return []
+
+    for root, _, files in os.walk(full_data_path):
         for file in files:
             file_path = os.path.join(root, file)
             print(f"Attempting to load file: {file_path}")
@@ -191,15 +202,19 @@ async def lifespan(app: FastAPI):
     global rag_chain
     print("Loading documents and setting up RAG pipeline...")
     # Ensure the data directory exists
-    os.makedirs(DATA_PATH, exist_ok=True)
+    # Use the data_path relative to the script's execution location
+    full_data_path = os.path.join(os.path.dirname(__file__), DATA_PATH)
+    os.makedirs(full_data_path, exist_ok=True)
+
     # For the PoC, let's create a dummy file if the data folder is empty to avoid issues
+    # Check if any supported files exist, not just any file
     supported_files_exist = any(
         f.endswith((".txt", ".docx", ".pdf"))
-        for f in os.listdir(DATA_PATH)
-        if os.path.isfile(os.path.join(DATA_PATH, f))
+        for f in os.listdir(full_data_path)
+        if os.path.isfile(os.path.join(full_data_path, f))
     )
     if not supported_files_exist:
-         dummy_file_path = os.path.join(DATA_PATH, "example_document.txt")
+         dummy_file_path = os.path.join(full_data_path, "example_document.txt")
          if not os.path.exists(dummy_file_path):
              with open(dummy_file_path, "w") as f:
                  f.write("This is an example document for the knowledge management PoC. It demonstrates that the system can load and process text files.")
@@ -209,7 +224,7 @@ async def lifespan(app: FastAPI):
 
 
     try:
-        document_chunks = load_documents(DATA_PATH)
+        document_chunks = load_documents(DATA_PATH) # Pass the relative path
         if document_chunks:
             vectorstore, llm = setup_rag_pipeline(document_chunks)
 
@@ -288,8 +303,8 @@ async def query_rag_direct(request: QueryRequest):
 app.include_router(router)
 
 # To run this FastAPI app for Teams bot integration:
-# 1. Save this code as knowledge_management_poc/backend/main.py
+# 1. Save this code as main.py in your backend directory.
 # 2. Ensure you have a .env file in the same directory with your GOOGLE_API_KEY, MicrosoftAppId, and MicrosoftAppPassword
-# 3. Navigate to the backend directory in your terminal: cd knowledge_management_poc/backend
+# 3. Navigate to the backend directory in your terminal: cd your_backend_directory
 # 4. Run the command: uvicorn main:app --reload
 # 5. Configure your bot in the Azure Bot Service and point its messaging endpoint to the URL where this FastAPI app is hosted (e.g., your public ngrok URL + /api/messages)
