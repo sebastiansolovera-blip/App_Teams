@@ -1,56 +1,54 @@
 {
-    "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
-    "manifestVersion": "1.16",
-    "version": "1.0.0",
-    "id": "{{MicrosoftAppId}}",
-    "packageName": "com.example.knowledgemanagementpoc.tab",
-    "developer": {
-        "name": "Your Name or Company",
-        "websiteUrl": "https://yourwebsite.com",
-        "privacyUrl": "https://yourwebsite.com/privacy",
-        "termsOfUseUrl": "https://yourwebsite.com/terms"
-    },
-    "name": {
-        "short": "Knowledge RAG Tab",
-        "full": "Knowledge Retrieval Augmented Generation Tab PoC"
-    },
-    "description": {
-        "short": "A PoC demonstrating RAG functionality in a Teams Tab",
-        "full": "This is a proof of concept Teams Tab that integrates Retrieval Augmented Generation (RAG) to answer questions based on local documents by connecting to a backend API."
-    },
-    "icons": {
-        "outline": "outline.png",
-        "color": "color.png"
-    },
-    "accentColor": "#60A5FA",
-    "permissions": [
-        "identity",
-        "messageTeamMembers"
-    ],
-    "validDomains": [
-        "sebastiansolovera-blip.github.io",
-        "app-temas.onrender.com"  // <-- This is your actual Render backend domain
-    ],
-    "configurableTabs": [
-        {
-            "configurationUrl": "https://sebastiansolovera-blip.github.io/App_Temas/frontend/index.html#/config",
-            "canUpdateConfiguration": true,
-            "scopes": [
-                "team",
-                "groupchat",
-                "personal"
-            ]
-        }
-    ],
-    "staticTabs": [
-        {
-            "entityId": "knowledgeRagStaticTab",
-            "name": "Knowledge RAG",
-            "contentUrl": "https://sebastiansolovera-blip.github.io/App_Temas/frontend/index.html",
-            "scopes": [
-                "personal"
-            ]
-        }
-    ]
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "00000000-0000-0000-0000-000000000000",
+  "packageName": "com.example.knowledgemanagementpoc.tab",
+  "developer": {
+    "name": "Your Name or Company",
+    "websiteUrl": "https://yourwebsite.com",
+    "privacyUrl": "https://yourwebsite.com/privacy",
+    "termsOfUseUrl": "https://yourwebsite.com/terms"
+  },
+  "name": {
+    "short": "Knowledge RAG Tab",
+    "full": "Knowledge Retrieval Augmented Generation Tab PoC"
+  },
+  "description": {
+    "short": "A PoC demonstrating RAG functionality in a Teams Tab",
+    "full": "This is a proof of concept Teams Tab that integrates Retrieval Augmented Generation (RAG) to answer questions based on local documents by connecting to a backend API."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#60A5FA",
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "sebastiansolovera-blip.github.io",
+    "app-temas.onrender.com"
+  ],
+  "configurableTabs": [
+    {
+      "configurationUrl": "https://sebastiansolovera-blip.github.io/App_Temas/docs/index.html#/config",  // Updated path to /docs/
+      "canUpdateConfiguration": true,
+      "scopes": [
+        "team",
+        "groupchat"
+      ]
+    }
+  ],
+  "staticTabs": [
+    {
+      "entityId": "knowledgeRagStaticTab",
+      "name": "Knowledge RAG",
+      "contentUrl": "https://sebastiansolovera-blip.github.io/App_Temas/docs/index.html",  // Updated path to /docs/
+      "scopes": [
+        "personal"
+      ]
+    }
+  ]
 }
-
