@@ -1,4 +1,3 @@
-import uvicorn
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, APIRouter, Request, Response # Keep Request and Response for Teams bot if needed
@@ -34,17 +33,19 @@ except ImportError:
     Activity = None
 
 
-# --- Rutas absolutas para Render ---
-BASE_DIR = os.path.dirname(__file__)  # apunta a /backend
-DATA_PATH = os.path.join(BASE_DIR, "data")
-CHROMA_PATH = os.environ.get("CHROMA_PATH", os.path.join(BASE_DIR, "chroma_db"))
+# Define the path to the data folder - No longer needed for loading, but keep for reference if needed
+# DATA_PATH = "data" # Not used for loading in this version
 
-# --- Globals ---
+# Define the local directory for the Chroma index
+# CORRECTED: Use relative path assuming the script is run from the backend directory
+CHROMA_PERSIST_DIR = "chroma_db_local" # Adjusted path assuming it's relative to backend directory
+
+# Global variable to hold the RAG chain and memory
 rag_chain = None
 memory = None # Global variable to hold the memory
 vectorstore = None # Keep vectorstore as a global to access it later if needed
 
-# --- Request body ---
+# Define the request body model - Keep as is
 class QueryRequest(BaseModel):
     query: str
 
