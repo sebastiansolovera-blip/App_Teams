@@ -13,3 +13,5 @@ botbuilder-core
 botbuilder-ai
 botbuilder-dialogs
 sentence-transformers
+pydantic
+botbuilder-schema
