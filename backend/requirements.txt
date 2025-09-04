@@ -8,3 +8,5 @@ langchain-google-genai
 sentence-transformers
 botbuilder-core
 chromadb
+docx2txt
+pypdf
