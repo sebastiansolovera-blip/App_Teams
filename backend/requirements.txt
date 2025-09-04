@@ -1,12 +1,10 @@
 fastapi
 uvicorn
-python-dotenv
-pydantic
 langchain
+langchain_google_genai
 langchain-community
-langchain-google-genai
-sentence-transformers
-botbuilder-core
+langchain-huggingface
 chromadb
-docx2txt
 pypdf
+python-dotenv
+python-docx
