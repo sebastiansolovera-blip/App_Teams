@@ -15,19 +15,36 @@ from langchain.memory import ConversationBufferMemory # Keep for conversational 
 # Remove prompt components if not explicitly needed by ConversationalRetrievalChain.from_llm
 # from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 
-# Define the path to the data folder - No longer needed for loading, but keep for reference if needed
-# DATA_PATH = "data" # Not used for loading in this version
+# Importa CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
-# Define the local directory for the Chroma index
-# CORRECTED: Use relative path assuming the script is run from the backend directory
-CHROMA_PERSIST_DIR = "chroma_db_local" # Adjusted path assuming it's relative to backend directory
+# Importaciones condicionales para el bot de Teams
+try:
+    from botbuilder.core import BotFrameworkAdapter, BotFrameworkAdapterSettings, TurnContext, ActivityHandler, MessageFactory
+    from botbuilder.schema import Activity
+    TEAMS_BOT_AVAILABLE = True
+except ImportError:
+    print("BotBuilder libraries not found. Teams bot functionality will be disabled.")
+    TEAMS_BOT_AVAILABLE = False
+    BotFrameworkAdapter = None
+    BotFrameworkAdapterSettings = None
+    TurnContext = None
+    ActivityHandler = object
+    MessageFactory = None
+    Activity = None
 
-# Global variable to hold the RAG chain and memory
+
+# --- Rutas absolutas para Render ---
+BASE_DIR = os.path.dirname(__file__)  # apunta a /backend
+DATA_PATH = os.path.join(BASE_DIR, "data")
+CHROMA_PATH = os.environ.get("CHROMA_PATH", os.path.join(BASE_DIR, "chroma_db"))
+
+# --- Globals ---
 rag_chain = None
 memory = None # Global variable to hold the memory
 vectorstore = None # Keep vectorstore as a global to access it later if needed
 
-# Define the request body model - Keep as is
+# --- Request body ---
 class QueryRequest(BaseModel):
     query: str
 
@@ -162,5 +179,4 @@ async def read_root():
 
 # --- Removed the /indexar-documentos endpoint ---
 # Indexing is now done locally using index_local.py
-# If you still want an index endpoint for re-index...port)
-
+# If you still want an index endpoint for re-index...
