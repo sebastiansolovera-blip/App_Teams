@@ -9,3 +9,6 @@ pypdf
 python-dotenv
 python-docx
 docx2txt
+botbuilder-core
+botbuilder-ai
+botbuilder-dialogs
