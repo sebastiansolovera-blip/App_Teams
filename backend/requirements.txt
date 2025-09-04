@@ -13,8 +13,9 @@ langchain-huggingface
 langchain-google-genai
 sentence-transformers
 transformers
-torch==2.8.0+cpu
+torch==2.8.0
 scikit-learn
 nltk
 httpx
 requests
+
