@@ -8,8 +8,11 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.document_loaders import TextLoader, Docx2txtLoader, PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterCharacterTextSplitter
 from contextlib import asynccontextmanager
+
+# Importa CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
 # Importaciones condicionales para el bot de Teams
 try:
@@ -144,6 +147,28 @@ async def lifespan(app: FastAPI):
     print("Shutdown complete.")
 
 app = FastAPI(lifespan=lifespan)
+
+# Define los orígenes permitidos para CORS.
+# ¡ACTUALIZA ESTO CON LA URL EXACTA DE TU SITIO DE GITHUB PAGES!
+origins = [
+    "https://<tu-usuario-github>.github.io", # Reemplaza con tu usuario de GitHub
+    "https://<tu-usuario-github>.github.io/<nombre-repo>", # Si es un sitio de proyecto
+    # Si necesitas probar localmente con el frontend:
+    # "http://localhost",
+    # "http://localhost:8080", # Ejemplo de puerto local, ajústalo si es necesario
+    # "http://127.0.0.1",
+    # "http://127.0.0.1:8080", # Ejemplo de puerto local
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Permite todos los métodos
+    allow_headers=["*"], # Permite todos los encabezados
+)
+
+
 router = APIRouter()
 
 # --- Add a root endpoint ---
