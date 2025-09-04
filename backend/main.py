@@ -11,8 +11,21 @@ from langchain_community.document_loaders import TextLoader, Docx2txtLoader, PyP
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from contextlib import asynccontextmanager
 
-from botbuilder.core import BotFrameworkAdapter, BotFrameworkAdapterSettings, TurnContext, ActivityHandler, MessageFactory
-from botbuilder.schema import Activity
+# Importaciones condicionales para el bot de Teams
+try:
+    from botbuilder.core import BotFrameworkAdapter, BotFrameworkAdapterSettings, TurnContext, ActivityHandler, MessageFactory
+    from botbuilder.schema import Activity
+    TEAMS_BOT_AVAILABLE = True
+except ImportError:
+    print("BotBuilder libraries not found. Teams bot functionality will be disabled.")
+    TEAMS_BOT_AVAILABLE = False
+    BotFrameworkAdapter = None
+    BotFrameworkAdapterSettings = None
+    TurnContext = None
+    ActivityHandler = object
+    MessageFactory = None
+    Activity = None
+
 
 # --- Rutas absolutas para Render ---
 BASE_DIR = os.path.dirname(__file__)  # apunta a /backend
@@ -68,29 +81,38 @@ def setup_rag_pipeline(llm, vectorstore):
     global rag_chain
     rag_chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
-        retriever=vectorstore.as_retriever()
+        retriever=vectorstore.as_retriever(),
+        return_source_documents=True
     )
     print("RAG pipeline setup complete.")
 
-# --- Teams Bot ---
-class RagBot(ActivityHandler):
-    async def on_message_activity(self, turn_context: TurnContext):
-        global rag_chain
-        user_query = turn_context.activity.text
+# --- Teams Bot (Condicional) ---
+if TEAMS_BOT_AVAILABLE:
+    class RagBot(ActivityHandler):
+        async def on_message_activity(self, turn_context: TurnContext):
+            global rag_chain
+            user_query = turn_context.activity.text
 
-        if rag_chain is None:
-            await turn_context.send_activity(MessageFactory.text("RAG pipeline is not initialized. Please run /indexar-documentos."))
-            return
+            if rag_chain is None:
+                await turn_context.send_activity(MessageFactory.text("RAG pipeline is not initialized. Please run /indexar-documentos."))
+                return
 
-        print(f"Received query from Teams: '{user_query}'")
-        try:
-            response = rag_chain({"question": user_query, "chat_history": []})
-            rag_response = response.get('answer', 'Could not retrieve a specific answer.')
-            await turn_context.send_activity(MessageFactory.text(rag_response))
-            print("Sent response to Teams.")
-        except Exception as e:
-            print(f"Error during RAG query from Teams: {e}")
-            await turn_context.send_activity(MessageFactory.text(f"An error occurred: {e}"))
+            print(f"Received query from Teams: '{user_query}'")
+            try:
+                response = rag_chain({"question": user_query, "chat_history": []})
+                rag_response = response.get('answer', 'Could not retrieve a specific answer.')
+                await turn_context.send_activity(MessageFactory.text(rag_response))
+                print("Sent response to Teams.")
+            except Exception as e:
+                print(f"Error during RAG query from Teams: {e}")
+                await turn_context.send_activity(MessageFactory.text(f"An error occurred: {e}"))
+else:
+    class RagBot:
+        def __init__(self):
+            print("Teams bot functionality is disabled.")
+        async def on_turn(self, turn_context):
+            pass
+
 
 # --- FastAPI App ---
 load_dotenv()
@@ -98,15 +120,21 @@ MICROSOFT_APP_ID = os.getenv("MicrosoftAppId")
 MICROSOFT_APP_PASSWORD = os.getenv("MicrosoftAppPassword")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-if not all([MICROSOFT_APP_ID, MICROSOFT_APP_PASSWORD, GOOGLE_API_KEY]):
-    print("WARNING: Missing one or more environment variables.")
+if TEAMS_BOT_AVAILABLE and MICROSOFT_APP_ID and MICROSOFT_APP_PASSWORD:
+    print("Initializing Teams Bot Adapter...")
+    SETTINGS = BotFrameworkAdapterSettings(
+        app_id=MICROSOFT_APP_ID,
+        app_password=MICROSOFT_APP_PASSWORD
+    )
+    ADAPTER = BotFrameworkAdapter(SETTINGS)
+    BOT = RagBot()
+    TEAMS_BOT_ENABLED = True
+else:
+    print("Microsoft App ID or Password not found. Teams bot endpoint will not be active.")
+    ADAPTER = None
+    BOT = None
+    TEAMS_BOT_ENABLED = False
 
-SETTINGS = BotFrameworkAdapterSettings(
-    app_id=MICROSOFT_APP_ID,
-    app_password=MICROSOFT_APP_PASSWORD
-)
-ADAPTER = BotFrameworkAdapter(SETTINGS)
-BOT = RagBot()
 
 # Lifespan (lightweight para Render)
 @asynccontextmanager
@@ -118,12 +146,21 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 router = APIRouter()
 
+# --- Add a root endpoint ---
+@router.get("/")
+async def read_root():
+    return {"message": "Knowledge Management Backend is running"}
+
+
 # --- Indexación de documentos ---
 @router.post("/indexar-documentos")
 async def index_documents():
     global vectorstore, rag_chain
     print("Starting document indexation process...")
     try:
+        if not GOOGLE_API_KEY:
+             return {"status": "error", "message": "GOOGLE_API_KEY environment variable not set."}
+
         document_chunks = load_documents(DATA_PATH)
         if not document_chunks:
             return {"status": "error", "message": "No documents found to index."}
@@ -144,21 +181,56 @@ async def index_documents():
         print(f"Error during indexation: {e}")
         return {"status": "error", "message": f"An error occurred: {e}"}
 
-# --- Endpoint Teams ---
-@router.post("/api/messages")
-async def messages(req: Request):
-    if "application/json" not in req.headers.get("Content-Type", ""):
-        return Response(status_code=415)
-    body = await req.json()
-    activity = Activity().deserialize(body)
-    auth_header = req.headers.get("Authorization", "")
-    await ADAPTER.process_activity(activity, auth_header, BOT.on_turn)
-    return Response(status_code=200)
+# --- Endpoint Teams (Condicional) ---
+if TEAMS_BOT_ENABLED:
+    @router.post("/api/messages")
+    async def messages(req: Request):
+        if "application/json" not in req.headers.get("Content-Type", ""):
+            return Response(status_code=415)
+        body = await req.json()
+        activity = Activity().deserialize(body)
+        auth_header = req.headers.get("Authorization", "")
+        await ADAPTER.process_activity(activity, auth_header, BOT.on_turn)
+        return Response(status_code=200)
+else:
+    pass
+
+# --- Endpoint RAG para el Frontend ---
+@router.post("/query")
+async def query_rag(request: QueryRequest):
+    """
+    Endpoint to query the RAG pipeline.
+    """
+    if rag_chain is None:
+        return {"response": "RAG pipeline is not initialized. Please call /indexar-documentos first.", "sources": []}
+
+    user_query = request.query
+
+    try:
+        response = await rag_chain.ainvoke({"question": user_query, "chat_history": []})
+
+        rag_response = response.get('answer', 'Could not retrieve a specific answer.')
+        source_documents = response.get('source_documents', [])
+
+        sources_list = []
+        for doc in source_documents:
+            sources_list.append({
+                'page_content': getattr(doc, 'page_content', 'N/A'),
+                'metadata': getattr(doc, 'metadata', {})
+            })
+
+        return {"response": rag_response, "sources": sources_list}
+    except Exception as e:
+        print(f"Error during RAG query: {e}")
+        return {"response": f"An error occurred during the query: {e}", "sources": []}
+
 
 # --- Healthcheck ---
 @router.get("/healthz")
 async def healthz():
-    return {"ok": True}
+    status = "OK" if rag_chain is not None else "Initializing RAG"
+    return {"status": status, "rag_initialized": rag_chain is not None}
+
 
 # --- Include router ---
 app.include_router(router)
@@ -168,4 +240,5 @@ if __name__ == "__main__":
     import os
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
+    print(f"Running Uvicorn locally on http://0.0.0.0:{port}")
     uvicorn.run("main:app", host="0.0.0.0", port=port)
