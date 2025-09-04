@@ -14,27 +14,27 @@ from contextlib import asynccontextmanager
 from botbuilder.core import BotFrameworkAdapter, BotFrameworkAdapterSettings, TurnContext, ActivityHandler, MessageFactory
 from botbuilder.schema import Activity
 
-# Paths
-DATA_PATH = "./data"
-CHROMA_PATH = "./chroma_db"
+# --- Rutas absolutas para Render ---
+BASE_DIR = os.path.dirname(__file__)  # apunta a /backend
+DATA_PATH = os.path.join(BASE_DIR, "data")
+CHROMA_PATH = os.environ.get("CHROMA_PATH", os.path.join(BASE_DIR, "chroma_db"))
 
-# Globals
+# --- Globals ---
 rag_chain = None
 vectorstore = None
 
-# Request body
+# --- Request body ---
 class QueryRequest(BaseModel):
     query: str
 
 # --- Document Loading ---
 def load_documents(data_path: str):
     documents = []
-    full_data_path = os.path.join(os.path.dirname(__file__), data_path)
-    if not os.path.exists(full_data_path):
-        print(f"Error: Data directory not found at {full_data_path}")
+    if not os.path.exists(data_path):
+        print(f"Error: Data directory not found at {data_path}")
         return []
 
-    for root, _, files in os.walk(full_data_path):
+    for root, _, files in os.walk(data_path):
         for file in files:
             file_path = os.path.join(root, file)
             print(f"Attempting to load file: {file_path}")
@@ -108,7 +108,62 @@ SETTINGS = BotFrameworkAdapterSettings(
 ADAPTER = BotFrameworkAdapter(SETTINGS)
 BOT = RagBot()
 
-# Lifespan: ligero para Render
+# Lifespan (lightweight para Render)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("Startup OK (light). RAG pipeline will be initialized solo on demand.")
+    yield
+    print("Shutdown complete.")
 
+app = FastAPI(lifespan=lifespan)
+router = APIRouter()
+
+# --- Indexación de documentos ---
+@router.post("/indexar-documentos")
+async def index_documents():
+    global vectorstore, rag_chain
+    print("Starting document indexation process...")
+    try:
+        document_chunks = load_documents(DATA_PATH)
+        if not document_chunks:
+            return {"status": "error", "message": "No documents found to index."}
+
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GOOGLE_API_KEY)
+        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+        vectorstore = Chroma.from_documents(
+            documents=document_chunks,
+            embedding=embeddings,
+            persist_directory=CHROMA_PATH
+        )
+        print("Indexation complete. RAG pipeline is ready.")
+        setup_rag_pipeline(llm, vectorstore)
+
+        return {"status": "success", "message": "Indexation completed. The RAG pipeline is now ready to handle queries."}
+    except Exception as e:
+        print(f"Error during indexation: {e}")
+        return {"status": "error", "message": f"An error occurred: {e}"}
+
+# --- Endpoint Teams ---
+@router.post("/api/messages")
+async def messages(req: Request):
+    if "application/json" not in req.headers.get("Content-Type", ""):
+        return Response(status_code=415)
+    body = await req.json()
+    activity = Activity().deserialize(body)
+    auth_header = req.headers.get("Authorization", "")
+    await ADAPTER.process_activity(activity, auth_header, BOT.on_turn)
+    return Response(status_code=200)
+
+# --- Healthcheck ---
+@router.get("/healthz")
+async def healthz():
+    return {"ok": True}
+
+# --- Include router ---
+app.include_router(router)
+
+# --- Render entrypoint ---
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=port)
