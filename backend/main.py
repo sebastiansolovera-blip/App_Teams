@@ -8,7 +8,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.document_loaders import TextLoader, Docx2txtLoader, PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterCharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from contextlib import asynccontextmanager
 
 # Importa CORSMiddleware
@@ -151,8 +151,8 @@ app = FastAPI(lifespan=lifespan)
 # Define los orígenes permitidos para CORS.
 # ¡ACTUALIZA ESTO CON LA URL EXACTA DE TU SITIO DE GITHUB PAGES!
 origins = [
-    "https://<tu-usuario-github>.github.io", # Reemplaza con tu usuario de GitHub
-    "https://<tu-usuario-github>.github.io/<nombre-repo>", # Si es un sitio de proyecto
+    "https://sebastiansolovera-blip.github.io", # Añadido el dominio base de GitHub Pages
+    "https://sebastiansolovera-blip.github.io/App_Teams", # Añadida la URL específica de tu sitio
     # Si necesitas probar localmente con el frontend:
     # "http://localhost",
     # "http://localhost:8080", # Ejemplo de puerto local, ajústalo si es necesario
@@ -207,7 +207,7 @@ async def index_documents():
         return {"status": "error", "message": f"An error occurred: {e}"}
 
 # --- Endpoint Teams (Condicional) ---
-if TEAMS_BOT_ENABLED:
+if TEAMS_BOT_AVAILABLE:
     @router.post("/api/messages")
     async def messages(req: Request):
         if "application/json" not in req.headers.get("Content-Type", ""):
