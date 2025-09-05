@@ -1,3 +1,4 @@
+import uvicorn
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, APIRouter, Request, Response # Keep Request and Response for Teams bot if needed
@@ -32,6 +33,8 @@ except ImportError:
     MessageFactory = None
     Activity = None
 
+# Ensure environment variables are loaded as early as possible
+load_dotenv()
 
 # Define the path to the data folder - No longer needed for loading, but keep for reference if needed
 # DATA_PATH = "data" # Not used for loading in this version
@@ -76,7 +79,7 @@ def setup_rag_pipeline_from_local_index():
         print("Chroma vector store loaded successfully from local index.")
 
         # 3. Initialize the chosen LLM - Must be the same as used for querying
-        load_dotenv() # Ensure environment variables are loaded
+        # load_dotenv() # Ensure environment variables are loaded - Already called at the top
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
         print("LLM initialized.")
 
