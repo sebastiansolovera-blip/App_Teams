@@ -40,8 +40,9 @@ load_dotenv()
 # DATA_PATH = "data" # Not used for loading in this version
 
 # Define the local directory for the Chroma index
-# CORRECTED: Use relative path assuming the script is run from the backend directory
-CHROMA_PERSIST_DIR = "chroma_db_local" # Adjusted path assuming it's relative to backend directory
+# CORRECTED: Use the environment variable CHROMA_PATH if available, otherwise use the local path
+CHROMA_PERSIST_DIR = os.environ.get("CHROMA_PATH", "chroma_db_local")
+
 
 # Global variable to hold the RAG chain and memory
 rag_chain = None
@@ -67,7 +68,7 @@ def setup_rag_pipeline_from_local_index():
     print(f"Attempting to load Chroma index from: {CHROMA_PERSIST_DIR}")
     # Ensure the Chroma index directory exists
     if not os.path.exists(CHROMA_PERSIST_DIR):
-        print(f"Error: Chroma index directory not found at {CHROMA_PERSIST_DIR}. Please run the local indexing script first.")
+        print(f"Error: Chroma index directory not found at {CHROMA_PERSIST_DIR}. Please run the local indexing script first and ensure the index is included in deployment.")
         return None, None, None, None # Return prompt template placeholder as well
 
     try:
